@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Happy Birthday</title>
+    
+    <!-- Fonts: Playfair Display (Elegant) & Outfit (Modern UI) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,600&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <style>
+        :root {
+            --bg-color: #050505;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --accent-primary: #7000ff;
+            --accent-secondary: #ff007a;
+            --glass-bg: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --font-heading: 'Playfair Display', serif;
+            --font-body: 'Outfit', sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            cursor: none; /* Custom cursor used */
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            overflow-x: hidden;
+            overscroll-behavior: none;
+        }
+
+        /* --- Global Noise Texture (Cinematic Grain) --- */
+        .noise-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.05;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='1'/%3E%3C/svg%3E");
+        }
+
+        /* --- Custom Cursor --- */
+        .cursor-dot,
+        .cursor-outline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            transform: translate(-50%, -50%);
+            border-radius: 50%;
+            z-index: 10000;
+            pointer-events: none;
+        }
+
+        .cursor-dot {
+            width: 8px;
+            height: 8px;
+            background-color: white;
+        }
+
+        .cursor-outline {
+            width: 40px;
+            height: 40px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            transition: width 0.2s, height 0.2s, background-color 0.2s;
+        }
+
+        body:hover .cursor-outline.hovered {
+            width: 60px;
+            height: 60px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-color: transparent;
+            mix-blend-mode: difference;
+        }
+
+        /* --- Background Canvas (Three.js) --- */
+        #bg-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+
+        /* --- Loader / Enter Screen --- */
+        #loader {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            background: #000;
+            z-index: 5000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            transition: opacity 1s ease;
+        }
+
+        .enter-btn {
+            padding: 1.5rem 3rem;
+            border: 1px solid rgba(255,255,255,0.2);
+            background: transparent;
+            color: white;
+            font-family: var(--font-body);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            font-size: 0.9rem;
+            border-radius: 50px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.4s ease;
+        }
+
+        .enter-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: 0.5s;
+        }
+
+        .enter-btn:hover::before {
+            left: 100%;
+        }
+
+        .enter-btn:hover {
+            border-color: white;
+            box-shadow: 0 0 20px rgba(255,255,255,0.2);
+        }
+
+        /* --- Main Layout --- */
+        main {
+            opacity: 0; /* Hidden until loaded */
+            position: relative;
+        }
+
+        section {
+            min-height: 100vh;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            position: relative;
+        }
+
+        /* --- Hero Section --- */
+        .hero-title {
+            font-family: var(--font-heading);
+            font-size: clamp(3rem, 8vw, 8rem);
+            line-height: 1;
+            text-align: center;
+            background: linear-gradient(to right, #fff, #aaa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 1rem;
+            opacity: 0;
+            transform: translateY(30px);
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1rem, 2vw, 1.5rem);
+            color: var(--text-muted);
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            opacity: 0;
+        }
+
+        .scroll-mouse {
+            width: 20px;
+            height: 35px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            padding-top: 5px;
+        }
+
+        .scroll-wheel {
+            width: 2px;
+            height: 8px;
+            background: white;
+            border-radius: 2px;
+            animation: scroll 2s infinite;
+        }
+
+        @keyframes scroll {
+            0% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(10px); opacity: 0; }
+        }
+
+        /* --- Gallery Section --- */
+        .gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .memory-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1rem;
+            aspect-ratio: 4/5;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .memory-card:hover {
+            transform: translateY(-10px) scale(1.02);
+            border-color: rgba(255,255,255,0.3);
+            z-index: 2;
+        }
+
+        .memory-img {
+            width: 100%;
+            height: 85%;
+            object-fit: cover;
+            border-radius: 8px;
+            filter: grayscale(40%);
+            transition: filter 0.5s ease;
+        }
+
+        .memory-card:hover .memory-img {
+            filter: grayscale(0%);
+        }
+
+        .memory-caption {
+            height: 15%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: var(--font-heading);
+            font-style: italic;
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        /* --- Letter Section --- */
+        .letter-container {
+            max-width: 800px;
+            width: 100%;
+            background: linear-gradient(145deg, rgba(255,255,255,0.05), rgba(255,255,255,0.01));
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            padding: 4rem;
+            border-radius: 24px;
+            position: relative;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .letter-text {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #ddd;
+        }
+
+        .highlight {
+            color: var(--accent-secondary);
+            font-weight: bold;
+        }
+
+        /* --- Interactive Cake Section --- */
+        .cake-container {
+            position: relative;
+            text-align: center;
+        }
+
+        .instruction-text {
+            margin-bottom: 2rem;
+            font-size: 1.2rem;
+            opacity: 0.7;
+        }
+
+        /* CSS Candle */
+        .candle-stick {
+            width: 20px;
+            height: 120px;
+            background: linear-gradient(#eee, #ccc);
+            margin: 0 auto;
+            border-radius: 4px;
+            position: relative;
+        }
+
+        .flame {
+            width: 20px;
+            height: 35px;
+            background: radial-gradient(white 10%, yellow 40%, orange 80%);
+            border-radius: 50% 50% 20% 20%;
+            position: absolute;
+            top: -40px;
+            left: 0;
+            transform-origin: center bottom;
+            animation: flicker 1s infinite alternate;
+            box-shadow: 0 0 20px orange, 0 0 40px red;
+            cursor: pointer;
+            transition: opacity 0.5s;
+        }
+
+        .flame:hover {
+            transform: scale(1.1);
+        }
+
+        @keyframes flicker {
+            0% { transform: skewX(-2deg) scaleY(1); opacity: 0.9; }
+            50% { transform: skewX(2deg) scaleY(1.1); opacity: 1; }
+            100% { transform: skewX(-1deg) scaleY(1); opacity: 0.9; }
+        }
+
+        .smoke {
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 10px;
+            height: 10px;
+            background: rgba(255,255,255,0.5);
+            border-radius: 50%;
+            opacity: 0;
+        }
+
+        /* --- Mobile responsiveness --- */
+        @media (max-width: 768px) {
+            .hero-title { font-size: 3.5rem; }
+            .letter-container { padding: 2rem; }
+            .cursor-dot, .cursor-outline { display: none; } /* Hide custom cursor on touch */
+            * { cursor: auto; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Audio Element (Hidden) -->
+    <!-- CUSTOMIZE: Replace 'src' with a direct link to a song they love -->
+    <audio id="bg-music" loop>
+        <source src="https://cdn.pixabay.com/download/audio/2022/10/25/audio_1f8c7b899e.mp3" type="audio/mpeg">
+    </audio>
+
+    <!-- Noise Overlay -->
+    <div class="noise-overlay"></div>
+
+    <!-- Custom Cursor Elements -->
+    <div class="cursor-dot" data-cursor-dot></div>
+    <div class="cursor-outline" data-cursor-outline></div>
+
+    <!-- 3D Background -->
+    <canvas id="bg-canvas"></canvas>
+
+    <!-- Loader / Enter Screen -->
+    <div id="loader">
+        <h2 style="margin-bottom: 2rem; font-family: var(--font-heading); font-style: italic;">A Special Experience</h2>
+        <button class="enter-btn" id="enterBtn">Tap to Unlock</button>
+    </div>
+
+    <main>
+        <!-- Hero Section -->
+        <section id="hero">
+            <h2 class="hero-subtitle">It's your day</h2>
+            <!-- CUSTOMIZE: Name -->
+            <h1 class="hero-title">Happy Birthday,<br>Sarah</h1>
+            <div class="scroll-indicator">
+                <div class="scroll-mouse">
+                    <div class="scroll-wheel"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Memories Section -->
+        <section id="gallery">
+            <h2 style="font-family: var(--font-heading); font-size: 3rem; margin-bottom: 3rem;">Visuals of You</h2>
+            <div class="gallery-grid">
+                <!-- CUSTOMIZE: Image URLs -->
+                <div class="memory-card hover-trigger">
+                    <img src="https://images.unsplash.com/photo-1492633423870-43d1cd2775eb?auto=format&fit=crop&w=500&q=80" class="memory-img" alt="Memory 1">
+                    <div class="memory-caption">The Adventure</div>
+                </div>
+                <div class="memory-card hover-trigger">
+                    <img src="https://images.unsplash.com/photo-1513201099705-a9746e1e201f?auto=format&fit=crop&w=500&q=80" class="memory-img" alt="Memory 2">
+                    <div class="memory-caption">The Smile</div>
+                </div>
+                <div class="memory-card hover-trigger">
+                    <img src="https://images.unsplash.com/photo-1523438885200-e635ba2c371e?auto=format&fit=crop&w=500&q=80" class="memory-img" alt="Memory 3">
+                    <div class="memory-caption">The Vibes</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Message Section -->
+        <section id="message">
+            <div class="letter-container hover-trigger">
+                <!-- CUSTOMIZE: The Letter -->
+                <p class="letter-text">
+                    Dear <span class="highlight">Sarah</span>,<br><br>
+                    Another year around the sun, and you only shine brighter. Watching you grow and evolve has been the highlight of my year. You bring so much light into this world, often in ways you don't even realize.
+                    <br><br>
+                    For the year ahead, I wish you moments of pure joy, quiet peace, and the courage to chase everything you want. I'm so lucky to be in your orbit.
+                    <br><br>
+                    Always,<br>
+                    <span class="highlight">Alex</span>
+                </p>
+            </div>
+        </section>
+
+        <!-- Interactive Cake Section -->
+        <section id="cake">
+            <div class="cake-container">
+                <p class="instruction-text">Close your eyes, make a wish,<br>and <strong>click the flame</strong>.</p>
+                <div class="candle-stick">
+                    <div class="flame" id="flame-trigger"></div>
+                    <div class="smoke" id="smoke-effect"></div>
+                </div>
+            </div>
+            <h1 id="wish-text" style="opacity: 0; margin-top: 2rem; font-family: var(--font-heading); color: var(--accent-secondary);">Dreams do come true.</h1>
+        </section>
+    </main>
+
+    <!-- Scripts: Three.js, GSAP, Confetti -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        // --- 1. Custom Cursor Logic ---
+        const cursorDot = document.querySelector('[data-cursor-dot]');
+        const cursorOutline = document.querySelector('[data-cursor-outline]');
+        const hoverTriggers = document.querySelectorAll('.hover-trigger, button, .flame');
+
+        window.addEventListener('mousemove', (e) => {
+            const posX = e.clientX;
+            const posY = e.clientY;
+
+            cursorDot.style.left = `${posX}px`;
+            cursorDot.style.top = `${posY}px`;
+
+            // Animate outline with slight delay for fluid feel
+            cursorOutline.animate({
+                left: `${posX}px`,
+                top: `${posY}px`
+            }, { duration: 500, fill: "forwards" });
+        });
+
+        hoverTriggers.forEach(trigger => {
+            trigger.addEventListener('mouseenter', () => cursorOutline.classList.add('hovered'));
+            trigger.addEventListener('mouseleave', () => cursorOutline.classList.remove('hovered'));
+        });
+
+        // --- 2. Three.js Background (Starfield Tunnel) ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.querySelector('#bg-canvas'), alpha: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+
+        // Create Stars
+        const starsGeometry = new THREE.BufferGeometry();
+        const starsCount = 2000;
+        const posArray = new Float32Array(starsCount * 3);
+
+        for(let i = 0; i < starsCount * 3; i++) {
+            posArray[i] = (Math.random() - 0.5) * 15; // Spread stars
+        }
+
+        starsGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+
+        const material = new THREE.PointsMaterial({
+            size: 0.005,
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.8
+        });
+
+        const starMesh = new THREE.Points(starsGeometry, material);
+        scene.add(starMesh);
+
+        camera.position.z = 2;
+
+        // Mouse interaction for background
+        let mouseX = 0;
+        let mouseY = 0;
+
+        document.addEventListener('mousemove', (event) => {
+            mouseX = event.clientX / window.innerWidth - 0.5;
+            mouseY = event.clientY / window.innerHeight - 0.5;
+        });
+
+        const animate = () => {
+            requestAnimationFrame(animate);
+            
+            // Rotate starfield
+            starMesh.rotation.y += 0.0005;
+            starMesh.rotation.x += 0.0002;
+
+            // Parallax effect
+            starMesh.rotation.y += mouseX * 0.01;
+            starMesh.rotation.x += mouseY * 0.01;
+
+            renderer.render(scene, camera);
+        };
+
+        animate();
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 3. Interaction & Animations (GSAP) ---
+        const enterBtn = document.getElementById('enterBtn');
+        const loader = document.getElementById('loader');
+        const main = document.querySelector('main');
+        const music = document.getElementById('bg-music');
+
+        gsap.registerPlugin(ScrollTrigger);
+
+        enterBtn.addEventListener('click', () => {
+            // Play Audio
+            music.volume = 0.5;
+            music.play().catch(e => console.log("Audio autoplay blocked"));
+
+            // Animate Loader Away
+            gsap.to(loader, {
+                opacity: 0,
+                duration: 1.5,
+                ease: "power2.inOut",
+                onComplete: () => {
+                    loader.style.display = 'none';
+                    main.style.opacity = 1;
+                    runIntroAnimations();
+                }
+            });
+        });
+
+        function runIntroAnimations() {
+            const tl = gsap.timeline();
+
+            tl.to('.hero-subtitle', { y: 0, opacity: 1, duration: 1, ease: "power3.out" })
+              .to('.hero-title', { y: 0, opacity: 1, duration: 1.2, ease: "power3.out" }, "-=0.5")
+              .to('.scroll-indicator', { opacity: 1, duration: 1 }, "-=0.5");
+
+            // Scroll Triggers
+            gsap.from('.memory-card', {
+                scrollTrigger: {
+                    trigger: '#gallery',
+                    start: "top 70%",
+                },
+                y: 50,
+                opacity: 0,
+                duration: 1,
+                stagger: 0.2,
+                ease: "power3.out"
+            });
+
+            gsap.from('.letter-container', {
+                scrollTrigger: {
+                    trigger: '#message',
+                    start: "top 70%",
+                },
+                scale: 0.9,
+                opacity: 0,
+                duration: 1.2,
+                ease: "power3.out"
+            });
+        }
+
+        // --- 4. Cake Interaction ---
+        const flame = document.getElementById('flame-trigger');
+        const smoke = document.getElementById('smoke-effect');
+        const wishText = document.getElementById('wish-text');
+
+        flame.addEventListener('click', () => {
+            // Blow out candle animation
+            gsap.to(flame, { opacity: 0, scale: 0, duration: 0.3 });
+            
+            // Smoke animation
+            gsap.to(smoke, { 
+                opacity: 1, 
+                y: -50, 
+                scale: 3, 
+                duration: 1.5, 
+                onComplete: () => smoke.style.opacity = 0 
+            });
+
+            // Reveal text
+            gsap.to(wishText, { opacity: 1, delay: 0.5, duration: 2 });
+
+            // Confetti Explosion
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 },
+                colors: ['#7000ff', '#ff007a', '#ffffff']
+            });
+
+            // Fire multiple rounds of confetti
+            setTimeout(() => {
+                confetti({
+                    particleCount: 100,
+                    angle: 60,
+                    spread: 55,
+                    origin: { x: 0 }
+                });
+                confetti({
+                    particleCount: 100,
+                    angle: 120,
+                    spread: 55,
+                    origin: { x: 1 }
+                });
+            }, 500);
+        });
+
+    </script>
+</body>
+</html>
